@@ -117,7 +117,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
 
 This function receives HTTP POST requests and writes the payload to the SQL database using the SQL output binding. The key environment variable is:
 
-- `SqlConnection`: The connection string for the Azure SQL Database
+- `AZURE_SQL_CONNECTION_STRING_KEY`: The identity-based connection string for the Azure SQL Database loaded from app settings or env vars
 
 **Source code:**
 ```csharp
