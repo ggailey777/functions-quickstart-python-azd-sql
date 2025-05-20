@@ -68,7 +68,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
        "WEBSITE_SITE_NAME": "ToDo-local",
-       "SqlConnectionString": "Server=tcp:<server>.database.windows.net,1433;Database=ToDo;Authentication=Active Directory Default; TrustServerCertificate=True; Encrypt=True;"
+       "AZURE_SQL_CONNECTION_STRING_KEY": "Server=tcp:<server>.database.windows.net,1433;Database=ToDo;Authentication=Active Directory Default; TrustServerCertificate=True; Encrypt=True;"
      }
    }
    ```
@@ -122,7 +122,7 @@ This function receives HTTP POST requests and writes the payload to the SQL data
 **Source code:**
 ```csharp
 [Function("httptrigger-sql-output")]
-[SqlOutput("[dbo].[ToDo]", connectionStringSetting: "SqlConnection")]
+[SqlOutput("[dbo].[ToDo]", connectionStringSetting: "AZURE_SQL_CONNECTION_STRING_KEY")]
 public async Task<ToDoItem> Run(
     [HttpTrigger(AuthorizationLevel.Function, "post", Route = "httptrigger-sql-output")] HttpRequestData req)
 {
@@ -149,7 +149,7 @@ This function responds to changes in the SQL database. It enables event-driven p
 ```csharp
 [Function("ToDoTrigger")]
 public static void Run(
-    [SqlTrigger("[dbo].[ToDo]", "SqlConnection")] IReadOnlyList<SqlChange<ToDoItem>> changes,
+    [SqlTrigger("[dbo].[ToDo]", "AZURE_SQL_CONNECTION_STRING_KEY")] IReadOnlyList<SqlChange<ToDoItem>> changes,
     FunctionContext context)
 {
     var logger = context.GetLogger("ToDoTrigger");
