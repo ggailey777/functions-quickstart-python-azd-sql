@@ -67,6 +67,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
      "Values": {
        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+       "WEBSITE_SITE_NAME": "ToDo-local",
        "SqlConnectionString": "Server=tcp:<server>.database.windows.net,1433;Database=ToDo;Authentication=Active Directory Default; TrustServerCertificate=True; Encrypt=True;"
      }
    }

@@ -17,6 +17,7 @@ if (-not (Test-Path "./app/local.settings.json")) {
         Values = @{
             AzureWebJobsStorage = "UseDevelopmentStorage=true"
             FUNCTIONS_WORKER_RUNTIME = "dotnet-isolated"
+            WEBSITE_SITE_NAME = "ToDo-local"
             AZURE_SQL_CONNECTION_STRING_KEY = $SqlConnection
         }
     }
