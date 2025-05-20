@@ -4,7 +4,7 @@ An Azure Functions QuickStart project that demonstrates how to use both SQL Trig
 
 ## Architecture
 
-![Azure Functions SQL Output Binding Architecture](./diagrams/architecture.drawio.png)
+![Azure Functions SQL Output Binding Architecture](./diagrams/architecture.png)
 
 This architecture shows how Azure Functions can both write to and react to changes in an Azure SQL Database using output bindings and triggers. The key components include:
 
