@@ -56,7 +56,6 @@ param logAnalyticsName string = ''
 param resourceGroupName string = ''
 param storageAccountName string = ''
 param sqlServerName string = ''
-param webServiceName string = ''
 param apimServiceName string = ''
 param connectionStringKey string = 'AZURE-SQL-CONNECTION-STRING'
 
@@ -81,7 +80,6 @@ var deploymentStorageContainerName = 'app-package-${take(functionAppName, 32)}-$
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
-var webUri = 'https://${web.outputs.defaultHostname}'
 var functionAppName = !empty(apiServiceName) ? apiServiceName : '${abbrs.webSitesFunctions}api-${resourceToken}'
 
 
@@ -101,18 +99,6 @@ module apiUserAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned
     location: location
     tags: tags
     name: !empty(apiUserAssignedIdentityName) ? apiUserAssignedIdentityName : '${abbrs.managedIdentityUserAssignedIdentities}api-${resourceToken}'
-  }
-}
-
-// The application frontend
-module web 'br/public:avm/res/web/static-site:0.9.0' = {
-  name: 'staticweb'
-  scope: rg
-  params: {
-    name: !empty(webServiceName) ? webServiceName : '${abbrs.webStaticSites}web-${resourceToken}'
-    location: location
-    provider: 'Custom'
-    tags: union(tags, { 'azd-service-name': 'web' })
   }
 }
 
@@ -156,7 +142,6 @@ module api './app/api.bicep' = {
       AZURE_SQL_CONNECTION_STRING_KEY: 'Server=${db.outputs.name}${environment().suffixes.sqlServerHostname}; Database=${db.outputs.databaseName}; Authentication=Active Directory Default; User Id=${apiUserAssignedIdentity.outputs.clientId}; TrustServerCertificate=True'
     }
     virtualNetworkSubnetId: vnetEnabled ? serviceVirtualNetwork.outputs.appSubnetID : ''
-    allowedOrigins: [ webUri ]
   }
 }
 
@@ -335,22 +320,6 @@ module apim 'br/public:avm/res/api-management/service:0.2.0' = if (useAPIM) {
   }
 }
 
-//Configures the API settings for an api app within the Azure API Management (APIM) service.
-module apimApi 'br/public:avm/ptn/azd/apim-api:0.1.0' = if (useAPIM) {
-  name: 'apim-api-deployment'
-  scope: rg
-  params: {
-    apiBackendUrl: api.outputs.SERVICE_API_URI
-    apiDescription: 'This is a simple Todo API'
-    apiDisplayName: 'Simple Todo API'
-    apiName: 'todo-api'
-    apiPath: 'todo'
-    name: useAPIM ? apim.outputs.name : ''
-    webFrontendUrl: webUri
-    location: location
-    apiAppName: api.outputs.SERVICE_API_NAME
-  }
-}
 
 // Data outputs
 output AZURE_SQL_CONNECTION_STRING_KEY string = 'Server=${db.outputs.fullyQualifiedDomainName}; Database=${db.outputs.databaseName}; Authentication=Active Directory Default; User Id=${apiUserAssignedIdentity.outputs.clientId}; TrustServerCertificate=True'
@@ -364,7 +333,4 @@ output AZURE_KEY_VAULT_ENDPOINT string = enableSQLScripts ? db.outputs.keyVaultU
 output AZURE_KEY_VAULT_NAME string = enableSQLScripts ? db.outputs.keyVaultName : ''
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
-output API_BASE_URL string = useAPIM ? apimApi.outputs.serviceApiUri : api.outputs.SERVICE_API_URI
-output REACT_APP_WEB_BASE_URL string = webUri
 output USE_APIM bool = useAPIM
-output SERVICE_API_ENDPOINTS array = useAPIM ? [ apimApi.outputs.serviceApiUri, api.outputs.SERVICE_API_URI ]: []
