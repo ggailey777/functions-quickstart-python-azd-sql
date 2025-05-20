@@ -38,9 +38,9 @@ module sqlServer 'br/public:avm/res/sql/server:0.16.1' = {
     publicNetworkAccess: vnetEnabled ? 'Disabled' : 'Enabled'
     administrators: {
       azureADOnlyAuthentication: true
-      login: apiUserAssignedIdentityName
-      principalType: 'Application'
-      sid: apiUserAssignedIdentityClientId
+      login: 'DeployerAdmin'
+      principalType: 'User'
+      sid: principalId
       tenantId: tenant().tenantId
     }
     databases: [
@@ -90,8 +90,8 @@ module deploymentScript 'br/public:avm/res/resources/deployment-script:0.1.3' = 
           secureValue: apiUserAssignedIdentityName
         }
         {
-          name: 'UAMICLIENTID-SQLADMIN'
-          secureValue: enableSQLScripts ? sqlAdminUserAssignedIdentity.outputs.clientId : ''
+          name: 'CLIENTID-SQLADMIN'
+          secureValue: enableSQLScripts ? principalId : ''
         }
       ]
     }
@@ -112,7 +112,7 @@ ALTER ROLE db_ddladmin ADD MEMBER [${UAMINAME-API}];
 GO
 SCRIPT_END
 
-./sqlcmd -S ${DBSERVER} -d ${DBNAME} --authentication-method ActiveDirectoryManagedIdentity -U {UAMICLIENTID-SQLADMIN} -i ./initDb.sql
+./sqlcmd -S ${DBSERVER} -d ${DBNAME} --authentication-method ActiveDirectoryManagedIdentity -U {CLIENTID-SQLADMIN} -i ./initDb.sql
     '''
   }
 }

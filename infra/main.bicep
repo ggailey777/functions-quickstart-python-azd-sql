@@ -324,8 +324,11 @@ module apim 'br/public:avm/res/api-management/service:0.2.0' = if (useAPIM) {
 // Data outputs
 output AZURE_SQL_CONNECTION_STRING_KEY string = 'Server=${db.outputs.fullyQualifiedDomainName}; Database=${db.outputs.databaseName}; Authentication=Active Directory Default; User Id=${apiUserAssignedIdentity.outputs.clientId}; TrustServerCertificate=True'
 output AZURE_SQL_SERVER_NAME string = db.outputs.fullyQualifiedDomainName
+output AZURE_SQL_SERVER_RESOURCE_NAME string = db.outputs.name
 output AZURE_SQL_DATABASE_NAME string = db.outputs.databaseName
 output USER_ASSIGNED_IDENTITY_CLIENT_ID string = apiUserAssignedIdentity.outputs.clientId
+output USER_ASSIGNED_IDENTITY_PRINCIPAL_ID string = apiUserAssignedIdentity.outputs.principalId
+output USER_ASSIGNED_IDENTITY_NAME string = apiUserAssignedIdentity.outputs.name
 
 // App outputs
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.connectionString
@@ -334,3 +337,4 @@ output AZURE_KEY_VAULT_NAME string = enableSQLScripts ? db.outputs.keyVaultName 
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output USE_APIM bool = useAPIM
+output RESOURCE_GROUP_NAME string = rg.name

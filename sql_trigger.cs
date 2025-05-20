@@ -8,7 +8,7 @@ public static class ToDoTrigger
 {
     [Function("sql_trigger_todo")]
     public static void Run(
-        [SqlTrigger("[dbo].[ToDo]", "SqlConnection")]
+        [SqlTrigger("[dbo].[ToDo]", "AZURE_SQL_CONNECTION_STRING_KEY")]
             IReadOnlyList<SqlChange<ToDoItem>> changes,
         FunctionContext context
     )

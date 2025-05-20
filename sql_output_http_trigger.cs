@@ -37,7 +37,7 @@ public class SqlOutputBindingHttpTriggerCSharp
 
 public class OutputType
 {
-    [SqlOutput("dbo.ToDo", connectionStringSetting: "SqlConnection")]
+    [SqlOutput("dbo.ToDo", connectionStringSetting: "AZURE_SQL_CONNECTION_STRING_KEY")]
     public required ToDoItem ToDoItem { get; set; }
 
     //[HttpResponse]
