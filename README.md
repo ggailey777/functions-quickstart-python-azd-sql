@@ -1,6 +1,6 @@
-# Azure Functions with SQL Triggers and Bindings (C#)
+# Azure Functions with SQL Triggers and Bindings (Python)
 
-An Azure Functions QuickStart project that demonstrates how to use both SQL Triggers and SQL Output Bindings with the Azure Developer CLI (azd) for rapid, event-driven integration with Azure SQL Database.
+An Azure Functions QuickStart project that demonstrates how to use both SQL Triggers and SQL Output Bindings with the Azure Developer CLI (azd) for rapid, event-driven integration with Azure SQL Database using Python v2 programming model.
 
 ## Architecture
 
@@ -30,15 +30,17 @@ This serverless architecture enables scalable, event-driven data ingestion and p
 
 * SQL Output Binding
 * SQL Trigger
+* Python v2 programming model
 * Azure Functions Flex Consumption plan
 * Azure Developer CLI (azd) integration for easy deployment
 * Infrastructure as Code using Bicep templates
+* Python 3.12 runtime
 
 ## Getting Started
 
 ### Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [Python 3.12](https://www.python.org/downloads/) or later
 - [Azure Functions Core Tools](https://docs.microsoft.com/azure/azure-functions/functions-run-local#install-the-azure-functions-core-tools)
 - [Azure Developer CLI (azd)](https://docs.microsoft.com/azure/developer/azure-developer-cli/install-azd)
 - An Azure subscription
@@ -47,8 +49,8 @@ This serverless architecture enables scalable, event-driven data ingestion and p
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/Azure-Samples/functions-quickstart-dotnet-azd-sql.git
-   cd functions-quickstart-dotnet-azd-sql
+   git clone https://github.com/Azure-Samples/functions-quickstart-python-azd-sql.git
+   cd functions-quickstart-python-azd-sql
    ```
 
 1. Provision Azure resources using azd
@@ -66,7 +68,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
      "IsEncrypted": false,
      "Values": {
        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-       "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+       "FUNCTIONS_WORKER_RUNTIME": "python",
        "WEBSITE_SITE_NAME": "ToDo-local",
        "AZURE_SQL_CONNECTION_STRING_KEY": "Server=tcp:<server>.database.windows.net,1433;Database=ToDo;Authentication=Active Directory Default; TrustServerCertificate=True; Encrypt=True;"
      }
@@ -74,6 +76,13 @@ This serverless architecture enables scalable, event-driven data ingestion and p
    ```
 
    The `azd` command automatically sets up the required connection strings and application settings.
+
+1. Set up Python virtual environment and install dependencies
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
 1. Start the function locally
    ```bash
@@ -105,7 +114,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
    ```
    This will build your function app and deploy it to Azure. The deployment process:
    - Checks for any bicep changes using `azd provision`
-   - Builds the .NET project using `azd package`
+   - Builds the Python project using `azd package`
    - Publishes the function app using `azd deploy`
    - Updates application settings in Azure
 
@@ -113,80 +122,100 @@ This serverless architecture enables scalable, event-driven data ingestion and p
 
 ## Understanding the Functions
 
-### SQL Output Binding Function (`sql_output_http_trigger.cs`)
+### SQL Output Binding Function (`function_app.py` - `http_trigger_sql_output`)
 
 This function receives HTTP POST requests and writes the payload to the SQL database using the SQL output binding. The key environment variable is:
 
 - `AZURE_SQL_CONNECTION_STRING_KEY`: The identity-based connection string for the Azure SQL Database loaded from app settings or env vars
 
 **Source code:**
-```csharp
-[Function("httptrigger-sql-output")]
-[SqlOutput("[dbo].[ToDo]", connectionStringSetting: "AZURE_SQL_CONNECTION_STRING_KEY")]
-public async Task<ToDoItem> Run(
-    [HttpTrigger(AuthorizationLevel.Function, "post", Route = "httptrigger-sql-output")] HttpRequestData req)
-{
-    var todoitem = await req.ReadFromJsonAsync<ToDoItem>() ?? new ToDoItem
-    {
-        Id = Guid.NewGuid(),
-        order = 1,
-        title = "Example: Walk the dog",
-        url = "https://example.com/todo/1",
-        completed = false
-    };
-    return todoitem;
-}
+```python
+@app.function_name("httptrigger-sql-output")
+@app.route(route="httptrigger-sql-output", methods=["POST"])
+@app.sql_output(arg_name="todo_output",
+                table_name="dbo.ToDo", 
+                connection_string_setting="AZURE_SQL_CONNECTION_STRING_KEY")
+def http_trigger_sql_output(req: func.HttpRequest, todo_output: func.Out[func.SqlRow]) -> func.HttpResponse:
+    """HTTP trigger with SQL output binding to insert ToDo items."""
+    # Parse the request body
+    req_body = req.get_json()
+    
+    # Create ToDoItem from request
+    todo_item = ToDoItem.from_dict(req_body)
+    
+    # Set the SQL output
+    todo_output.set(func.SqlRow.from_dict(todo_item.to_dict()))
+    
+    # Return success response
+    return func.HttpResponse(
+        json.dumps(todo_item.to_dict()),
+        status_code=200,
+        mimetype="application/json"
+    )
 ```
-- Accepts a JSON body matching the `ToDoItem` class (see below).
+- Accepts a JSON body matching the `ToDoItem` model (see below).
 - Writes the item to the `[dbo].[ToDo]` table in SQL.
 - Returns the created object as the HTTP response.
 
-### SQL Trigger Function (`sql_trigger.cs`)
+### SQL Trigger Function (`function_app.py` - `sql_trigger_todo`)
 
 This function responds to changes in the SQL database. It enables event-driven processing whenever rows in the `[dbo].[ToDo]` table are inserted, updated, or deleted.
 
 **Source code:**
-```csharp
-[Function("ToDoTrigger")]
-public static void Run(
-    [SqlTrigger("[dbo].[ToDo]", "AZURE_SQL_CONNECTION_STRING_KEY")] IReadOnlyList<SqlChange<ToDoItem>> changes,
-    FunctionContext context)
-{
-    var logger = context.GetLogger("ToDoTrigger");
-    foreach (SqlChange<ToDoItem> change in changes)
-    {
-        ToDoItem toDoItem = change.Item;
-        logger.LogInformation($"Change operation: {change.Operation}");
-        logger.LogInformation($"Id: {toDoItem.Id}, Title: {toDoItem.title}, Url: {toDoItem.url}, Completed: {toDoItem.completed}");
-    }
-}
+```python
+@app.sql_trigger(arg_name="changes", 
+                 table_name="[dbo].[ToDo]",
+                 connection_string_setting="AZURE_SQL_CONNECTION_STRING_KEY")
+def sql_trigger_todo(changes: List[func.SqlRow]) -> None:
+    """SQL trigger function that responds to changes in the ToDo table."""
+    logging.info("SQL trigger function processed changes")
+    
+    for change in changes:
+        # Get the operation type and item data
+        operation = change.operation
+        item_data = dict(change.item)
+        
+        # Convert to ToDoItem for consistent handling
+        todo_item = ToDoItem.from_dict(item_data)
+        
+        logging.info(f"Change operation: {operation}")
+        logging.info(f"Id: {todo_item.id}, Title: {todo_item.title}, "
+                    f"Url: {todo_item.url}, Completed: {todo_item.completed}")
 ```
 - Monitors the `[dbo].[ToDo]` table for changes.
 - Logs the operation type and details of each changed item.
 
-### ToDoItem Model (`ToDoItem.cs`)
+### ToDoItem Model (`todo_item.py`)
 
-```csharp
-public class ToDoItem
-{
-    [JsonPropertyName("id")]
-    public Guid Id { get; set; }
-    public int? order { get; set; }
-    public required string title { get; set; }
-    public required string url { get; set; }
-    public bool? completed { get; set; }
-}
+```python
+@dataclass
+class ToDoItem:
+    """ToDo item model for Azure SQL Database."""
+    id: str
+    title: str
+    url: str
+    order: Optional[int] = None
+    completed: Optional[bool] = None
+    
+    def __init__(self, id: str = None, title: str = "", url: str = "", 
+                 order: Optional[int] = None, completed: Optional[bool] = None):
+        self.id = id if id is not None else str(uuid.uuid4())
+        self.title = title
+        self.url = url
+        self.order = order
+        self.completed = completed
 ```
 
-- The JSON property `id` maps to the C# property `Id`.
-- All other properties map directly by name and type.
+- The model uses Python dataclass for clean data structure.
+- All properties map directly by name and type to SQL columns.
+- Includes helper methods for JSON conversion.
 
 ## Monitoring and Logs
 
 You can monitor your function in the Azure Portal:
 1. Navigate to your function app in the Azure Portal
 2. Select "Functions" from the left menu
-3. Click on your function (SqlOutputBindingHttpTriggerCSharp1 or ToDoTrigger)
+3. Click on your function (httptrigger-sql-output or sql_trigger_todo)
 4. Select "Monitor" to view execution logs
 
 Use the "Live Metrics" feature to see real-time information when testing.
