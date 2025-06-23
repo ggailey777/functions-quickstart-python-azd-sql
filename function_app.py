@@ -51,8 +51,8 @@ def http_trigger_sql_output(req: func.HttpRequest, todo_output: func.Out[func.Sq
         # Create ToDoItem from request
         todo_item = ToDoItem.from_dict(req_body)
         
-        # Set the SQL output
-        todo_output.set(func.SqlRow.from_dict(todo_item.to_dict()))
+        # Set the SQL output - using the dictionary directly since SqlRow.from_dict may not exist
+        todo_output.set(todo_item.to_dict())
         
         # Return success response
         return func.HttpResponse(
