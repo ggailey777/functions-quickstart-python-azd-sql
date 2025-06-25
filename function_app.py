@@ -39,7 +39,7 @@ def sql_trigger_todo(changes: str) -> None:
 
 
 @app.function_name("httptrigger-sql-output")
-@app.route(route="httptrigger-sql-output", methods=["POST"])
+@app.route(route="httptriggersqloutput", methods=["POST"])
 @app.sql_output(arg_name="todo",
                 command_text="[dbo].[ToDo]", 
                 connection_string_setting="AZURE_SQL_CONNECTION_STRING_KEY")
