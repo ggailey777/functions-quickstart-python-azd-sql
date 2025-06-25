@@ -43,6 +43,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
 - [Python 3.12](https://www.python.org/downloads/) or later
 - [Azure Functions Core Tools](https://docs.microsoft.com/azure/azure-functions/functions-run-local#install-the-azure-functions-core-tools)
 - [Azure Developer CLI (azd)](https://docs.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+- [Azurite](https://github.com/Azure/Azurite) (for local Azure Storage emulation; can be run with `npx azurite`)
 - An Azure subscription
 
 ### Quickstart
@@ -84,6 +85,11 @@ This serverless architecture enables scalable, event-driven data ingestion and p
    pip install -r requirements.txt
    ```
 
+1. Start Azurite (local storage emulator)
+   ```bash
+   npx azurite --location ~/azurite-data
+   ```
+
 1. Start the function locally
    ```bash
    func start
@@ -102,7 +108,7 @@ This serverless architecture enables scalable, event-driven data ingestion and p
    ```
    You can use tools like curl, Postman, or httpie:
    ```bash
-   curl -X POST http://localhost:7071/api/httptrigger-sql-output \
+   curl -X POST http://localhost:7071/api/httptriggersqloutput \
      -H "Content-Type: application/json" \
      -d '{"id":"b1a7c1e2-1234-4f56-9abc-1234567890ab","order":1,"title":"Example: Walk the dog","url":"https://example.com/todo/1","completed":false}'
    ```
@@ -128,34 +134,34 @@ This function receives HTTP POST requests and writes the payload to the SQL data
 
 - `AZURE_SQL_CONNECTION_STRING_KEY`: The identity-based connection string for the Azure SQL Database loaded from app settings or env vars
 
+The function uses `command_text` instead of `table_name` to specify the SQL target table, which is a key feature of the SQL output binding in Azure Functions.
+
 **Source code:**
 ```python
 @app.function_name("httptrigger-sql-output")
-@app.route(route="httptrigger-sql-output", methods=["POST"])
-@app.sql_output(arg_name="todo_output",
-                table_name="dbo.ToDo", 
+@app.route(route="httptriggersqloutput", methods=["POST"])
+@app.sql_output(arg_name="todo",
+                command_text="[dbo].[ToDo]", 
                 connection_string_setting="AZURE_SQL_CONNECTION_STRING_KEY")
-def http_trigger_sql_output(req: func.HttpRequest, todo_output: func.Out[func.SqlRow]) -> func.HttpResponse:
+def http_trigger_sql_output(req: func.HttpRequest, todo: func.Out[func.SqlRow]) -> func.HttpResponse:
     """HTTP trigger with SQL output binding to insert ToDo items."""
     # Parse the request body
     req_body = req.get_json()
     
-    # Create ToDoItem from request
-    todo_item = ToDoItem.from_dict(req_body)
-    
-    # Set the SQL output
-    todo_output.set(func.SqlRow.from_dict(todo_item.to_dict()))
+    # Create SqlRow directly from the request body
+    row = func.SqlRow.from_dict(req_body)
+    todo.set(row)
     
     # Return success response
     return func.HttpResponse(
-        json.dumps(todo_item.to_dict()),
-        status_code=200,
+        json.dumps(req_body),
+        status_code=201,
         mimetype="application/json"
     )
 ```
-- Accepts a JSON body matching the `ToDoItem` model (see below).
-- Writes the item to the `[dbo].[ToDo]` table in SQL.
-- Returns the created object as the HTTP response.
+- Accepts a JSON body matching the database schema
+- Writes the item to the `[dbo].[ToDo]` table in SQL using the `func.SqlRow.from_dict()` method
+- Returns the created object as the HTTP response with a 201 Created status code
 
 ### SQL Trigger Function (`function_app.py` - `sql_trigger_todo`)
 
@@ -166,21 +172,30 @@ This function responds to changes in the SQL database. It enables event-driven p
 @app.sql_trigger(arg_name="changes", 
                  table_name="[dbo].[ToDo]",
                  connection_string_setting="AZURE_SQL_CONNECTION_STRING_KEY")
-def sql_trigger_todo(changes: List[func.SqlRow]) -> None:
+def sql_trigger_todo(changes: str) -> None:
     """SQL trigger function that responds to changes in the ToDo table."""
     logging.info("SQL trigger function processed changes")
     
-    for change in changes:
-        # Get the operation type and item data
-        operation = change.operation
-        item_data = dict(change.item)
+    # Parse the changes string as JSON
+    try:
+        changes_list = json.loads(changes)
         
-        # Convert to ToDoItem for consistent handling
-        todo_item = ToDoItem.from_dict(item_data)
-        
-        logging.info(f"Change operation: {operation}")
-        logging.info(f"Id: {todo_item.id}, Title: {todo_item.title}, "
-                    f"Url: {todo_item.url}, Completed: {todo_item.completed}")
+        for change in changes_list:
+            # Get the operation type and item data
+            operation = change.get('Operation', 'Unknown')
+            item_data = change.get('Item', {})
+            
+            # Convert to ToDoItem for consistent handling
+            todo_item = ToDoItem.from_dict(item_data)
+            
+            logging.info(f"Change operation: {operation}")
+            logging.info(f"Id: {todo_item.id}, Title: {todo_item.title}, "
+                        f"Url: {todo_item.url}, Completed: {todo_item.completed}")
+    except json.JSONDecodeError:
+        logging.error(f"Failed to parse changes as JSON: {changes}")
+    except Exception as e:
+        logging.error(f"Error processing changes: {str(e)}")
+        logging.error(f"Changes content: {changes}")
 ```
 - Monitors the `[dbo].[ToDo]` table for changes.
 - Logs the operation type and details of each changed item.
@@ -228,6 +243,7 @@ Use the "Live Metrics" feature to see real-time information when testing.
 
 **Example Log Output:**
 ```
+SQL trigger function processed changes
 Change operation: Insert
 Id: b1a7c1e2-1234-4f56-9abc-1234567890ab, Title: Example: Walk the dog, Url: https://example.com/todo/1, Completed: False
 ```
