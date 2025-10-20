@@ -265,3 +265,14 @@ __pycache__/
 
 # Ignore sqlcmd binaries and archives
 sqlcmd*
+
+# Python .venv directory
+.venv/
+
+# Azurite storage emulator files
+.azurite/
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+__azurite_db*.json
+*.db
